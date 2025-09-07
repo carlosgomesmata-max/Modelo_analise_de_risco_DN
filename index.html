@@ -1,4 +1,4 @@
-CTYPE html>
+<!DOCTYPE html>
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
@@ -123,47 +123,17 @@ CTYPE html>
             try {
                 const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } = window.firebase;
 
-
+                // ===================================================================================
+                // IMPORTANTE: CONFIGURAÇÃO DO FIREBASE
+                // ===================================================================================
                 const GITHUB_FIREBASE_CONFIG = {
-// Import the functions you need from the SDKs you need
-
-import { initializeApp } from "firebase/app";
-
-import { getAnalytics } from "firebase/analytics";
-
-// TODO: Add SDKs for Firebase products that you want to use
-
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-
-// Your web app's Firebase configuration
-
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-
-const firebaseConfig = {
-
-  apiKey: "AIzaSyCcpSTYkV5SumpC28J9NwFHmmQKW6Dp9vo",
-
-  authDomain: "modelo-analise-de-risco.firebaseapp.com",
-
-  projectId: "modelo-analise-de-risco",
-
-  storageBucket: "modelo-analise-de-risco.firebasestorage.app",
-
-  messagingSenderId: "808630343356",
-
-  appId: "1:808630343356:web:f7c54d8fd7cb4249a3a2b9",
-
-  measurementId: "G-PPDK22QY2N"
-
-};
-
-
-// Initialize Firebase
-
-const app = initializeApp(firebaseConfig);
-
-const analytics = getAnalytics(app);
+                    apiKey: "AIzaSyCcpSTYkV5SumpC28J9NwFHmmQKW6Dp9vo",
+                    authDomain: "modelo-analise-de-risco.firebaseapp.com",
+                    projectId: "modelo-analise-de-risco",
+                    storageBucket: "modelo-analise-de-risco.firebasestorage.app",
+                    messagingSenderId: "808630343356",
+                    appId: "1:808630343356:web:f7c54d8fd7cb4249a3a2b9",
+                    measurementId: "G-PPDK22QY2N"
                 };
                 
                 // Usa a configuração fornecida pelo ambiente (Canvas) se existir, senão usa a configuração manual.
@@ -174,7 +144,7 @@ const analytics = getAnalytics(app);
                 // Usa o app_id fornecido pelo ambiente se existir.
                 const appId_str = typeof __app_id !== 'undefined' ? __app_id : 'github-hosted-app';
                 
-                // Verifica se as chaves são placeholders APENAS se a configuração do ambiente não foi encontrada.
+                // Verifica se as chaves ainda são placeholders APENAS se a configuração do ambiente não foi encontrada.
                 if (typeof __firebase_config === 'undefined' && finalFirebaseConfig.apiKey.includes("COLE_A_SUA")) {
                     document.body.innerHTML = `<div class="p-8 text-center bg-red-100 text-red-800"><h1>Erro de Configuração</h1><p>As chaves de configuração do Firebase não foram preenchidas no ficheiro index.html. Siga as instruções no código para configurar a sua aplicação.</p></div>`;
                     throw new Error("A configuração do Firebase não foi definida.");
@@ -517,4 +487,3 @@ const analytics = getAnalytics(app);
     </script>
 </body>
 </html>
-
