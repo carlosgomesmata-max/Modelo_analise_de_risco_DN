@@ -47,9 +47,13 @@
         .extreme-risk-alert-row { border: 2px solid #ef4444 !important; background-color: #fef2f2; }
         .extreme-risk-icon { color: #ef4444; display: none; } .extreme-risk-alert-row .extreme-risk-icon { display: inline-block; }
         .tab-content { display: none; } .tab-content.active { display: block; }
-        #material-emergencia-container { column-count: 1; column-gap: 1rem; }
-        @media (min-width: 640px) { #material-emergencia-container { column-count: 2; } }
-        @media (min-width: 1024px) { #material-emergencia-container { column-count: 3; } }
+        #material-emergencia-container {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 640px) { #material-emergencia-container { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1024px) { #material-emergencia-container { grid-template-columns: repeat(3, 1fr); } }
         @media print { body * { visibility: hidden; } .print-section, .print-section * { visibility: visible; } .print-section { position: absolute; left: 0; top: 0; width: 100%; } .no-print { display: none; } }
         #loading-spinner { border-top-color: #3498db; }
         
@@ -130,7 +134,7 @@
                     apiKey: "AIzaSyCcpSTYkV5SumpC28J9NwFHmmQKW6Dp9vo",
                     authDomain: "modelo-analise-de-risco.firebaseapp.com",
                     projectId: "modelo-analise-de-risco",
-                    storageBucket: "modelo-analise-de-risco.appspot.com", // <-- CORRIGIDO
+                    storageBucket: "modelo-analise-de-risco.appspot.com",
                     messagingSenderId: "808630343356",
                     appId: "1:808630343356:web:f7c54d8fd7cb4249a3a2b9",
                     measurementId: "G-PPDK22QY2N"
@@ -219,6 +223,7 @@
                         <div class="bg-white p-6 rounded-lg shadow-md no-print">
                             <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Ações da Fase 1</h2>
                             <div class="flex flex-wrap gap-4">
+                                <button id="save-fase1-btn" class="btn btn-primary font-bold py-2 px-4 rounded-lg">Guardar Registo</button>
                                 <button id="export-fase1-pdf-btn" class="btn btn-secondary font-bold py-2 px-4 rounded-lg">Exportar (PDF)</button>
                                 <button id="export-fase1-excel-btn" class="btn btn-success font-bold py-2 px-4 rounded-lg">Exportar (Excel)</button>
                             </div>
@@ -242,6 +247,7 @@
                     document.getElementById('preliminaryDate').valueAsDate = new Date();
                     document.getElementById('export-fase1-pdf-btn').addEventListener('click', () => exportPdf('#fase1'));
                     document.getElementById('export-fase1-excel-btn').addEventListener('click', exportPhase1Excel);
+                    document.getElementById('save-fase1-btn').addEventListener('click', saveAssessment);
                 };
                 
                 const renderFase2 = () => {
@@ -370,7 +376,7 @@
                     if(!userId) { showNotification("Erro: Utilizador não autenticado.", true); return; }
                     const fase1Data = { companyName: document.getElementById('companyName').value.trim(), preliminaryDate: document.getElementById('preliminaryDate').value, technicianName: document.getElementById('technicianName').value.trim(), technicianAge: document.getElementById('technicianAge').value, medidasChecked: Array.from(document.querySelectorAll('#fase1 input[data-measure-text]:checked')).map(cb => cb.dataset.measureText), materialChecked: Array.from(document.querySelectorAll('#fase1 input[data-material-text]:checked')).map(cb => ({ category: cb.dataset.materialCategory, item: cb.dataset.materialText })) };
                     const fase2Data = { evaluatorName: document.getElementById('evaluatorName').value.trim(), evalDate: document.getElementById('evalDate').value, location: document.getElementById('location').value.trim(), activity: document.getElementById('activity').value.trim() };
-                    if (!fase2Data.evaluatorName || !fase2Data.evalDate || !fase2Data.location || !fase2Data.activity) { showNotification("Preencha todas as informações da Avaliação (Fase 2).", true); return; }
+                    
                     let highestRiskScore = 0; const evaluatedFactors = [];
                     document.querySelectorAll('#fase2 [id^="row-"]').forEach(r => { const s = parseInt(r.dataset.score, 10); if (s > highestRiskScore) highestRiskScore = s; const f = r.id.split('-')[1]; evaluatedFactors.push({ id: f, text: document.getElementById(`text-${f}`).textContent, score: s, dimension: r.dataset.dimension }); });
                     const oC = getRiskClassification(highestRiskScore);
@@ -398,46 +404,173 @@
                 
                 const applyFilters = () => {
                     const sD=document.getElementById('filter-start-date').value, eD=document.getElementById('filter-end-date').value, l=document.getElementById('filter-location').value.toLowerCase(), e=document.getElementById('filter-evaluator').value.toLowerCase();
-                    filteredAssessments=allAssessments.filter(i=>{ const iD=i.fase2?.evalDate||'', loc=i.fase2?.location||'', evN=i.fase2?.evaluatorName||''; return(!sD||iD>=sD)&&(!eD||iD<=eD)&&(!l||loc.toLowerCase().includes(l))&&(!e||evN.toLowerCase().includes(e));});
+                    filteredAssessments=allAssessments.filter(i=>{ 
+                        const evalDate = i.createdAt?.toDate ? i.createdAt.toDate().toISOString().split('T')[0] : i.fase2?.evalDate || '';
+                        const loc=i.fase2?.location||'', evN=i.fase2?.evaluatorName||''; 
+                        return(!sD||evalDate>=sD)&&(!eD||evalDate<=eD)&&(!l||loc.toLowerCase().includes(l))&&(!e||evN.toLowerCase().includes(e));
+                    });
                     renderHistoryList(filteredAssessments); updateAnalysisChart(filteredAssessments);
                 };
 
                 const renderHistoryList = (a) => {
                     const hE=document.getElementById('assessment-history-list'); if(a.length===0){hE.innerHTML='<p>Nenhuma avaliação encontrada.</p>'; return;}
-                    hE.innerHTML=a.map(i=>{ if (!i.fase2) return ''; const oRL = i.fase2.overallRiskLevel || 'N/A'; const riskScoreMap = { "Risco Baixo": 1, "Risco Moderado": 5, "Risco Elevado": 10, "Risco Extremo": 17 }; const cl=getRiskClassification(riskScoreMap[oRL] || 1); const bg=cl.colorClass.replace('risk-','bg-'); return `<div class="border rounded-lg p-4 flex justify-between items-center"><div><p class="font-bold">${i.fase2.activity} em ${i.fase2.location}</p><p class="text-sm text-gray-600">Avaliador: ${i.fase2.evaluatorName} em ${new Date(i.fase2.evalDate).toLocaleDateString()}</p></div><div class="text-right"><span class="px-3 py-1 text-sm font-semibold text-white ${bg} rounded-full">${oRL}</span></div></div>`;}).join('');
+                    hE.innerHTML=a.map(i=>{ 
+                        if (!i.fase2) return ''; 
+                        const oRL = i.fase2.overallRiskLevel || 'N/A'; 
+                        const riskScoreMap = { "Risco Baixo": 1, "Risco Moderado": 5, "Risco Elevado": 10, "Risco Extremo": 17 }; 
+                        const cl=getRiskClassification(riskScoreMap[oRL] || 1); 
+                        const bg=cl.colorClass.replace('risk-','bg-');
+                        const displayDate = i.createdAt?.toDate ? i.createdAt.toDate().toLocaleDateString() : (i.fase2.evalDate ? new Date(i.fase2.evalDate + 'T00:00:00').toLocaleDateString() : 'Sem data');
+                        return `<div class="border rounded-lg p-4 flex justify-between items-center"><div><p class="font-bold">${i.fase2.activity || 'Atividade não especificada'} em ${i.fase2.location || 'Local não especificado'}</p><p class="text-sm text-gray-600">Avaliador: ${i.fase2.evaluatorName || 'N/A'} em ${displayDate}</p></div><div class="text-right"><span class="px-3 py-1 text-sm font-semibold text-white ${bg} rounded-full">${oRL}</span></div></div>`;
+                    }).join('');
                 };
                 
                 const exportSingleExcel = () => {
                     if (document.getElementById('results-content-assessment').classList.contains('hidden')) return showNotification("Calcule os resultados antes de exportar.", true);
+                    
                     const wb = XLSX.utils.book_new();
+
+                    // --- 1. Resumo Sheet ---
                     const gIF1 = { "Empresa/Instituição": document.getElementById('companyName').value, "Data Análise": document.getElementById('preliminaryDate').value, "Nome do Técnico": document.getElementById('technicianName').value, "Idade": document.getElementById('technicianAge').value };
                     const gIF2 = { Avaliador: document.getElementById('evaluatorName').value, "Data Avaliação": document.getElementById('evalDate').value, Local: document.getElementById('location').value, Atividade: document.getElementById('activity').value };
                     const oR = { "Nível de Risco Geral": document.getElementById('overall-result').querySelector('p').textContent, "Recomendação": document.getElementById('overall-result').querySelector('span').textContent };
-                    const sumS = XLSX.utils.json_to_sheet([ { "Relatório de Análise de Risco": "" }, {}, { Seção: "Fase 1 - Informações Gerais" }, gIF1, {}, { Seção: "Fase 2 - Informações da Avaliação" }, gIF2, {}, { Seção: "Resultado Geral" }, oR ]);
-                    XLSX.utils.book_append_sheet(wb, sumS, "Resumo");
-                    const f1D = []; document.querySelectorAll('#fase1 input[data-measure-text]:checked').forEach(cb => f1D.push({ 'Medida de Segurança Verificada': cb.dataset.measureText })); f1D.push({}); document.querySelectorAll('#fase1 input[data-material-text]:checked').forEach(cb => f1D.push({ 'Categoria de Material': cb.dataset.materialCategory, 'Item Verificado': cb.dataset.materialText }));
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(f1D), "Fase 1 - Detalhes");
-                    const f2D = []; document.querySelectorAll('#fase2 [id^="row-"]').forEach(r => { const f = r.id.split('-')[1]; f2D.push({ 'Dimensão': r.dataset.dimension, 'Fator de Risco': document.getElementById(`text-${f}`).textContent, 'Score': r.dataset.score, 'Nível': getRiskClassification(parseInt(r.dataset.score)).level }); });
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(f2D, {header: ['Dimensão', 'Fator de Risco', 'Score', 'Nível']}), "Fase 2 - Detalhes");
+
+                    const summaryData = [
+                        ["Relatório de Análise de Risco"],
+                        [], // Spacer
+                        ["Fase 1 - Informações Gerais"],
+                        ["Empresa/Instituição", gIF1["Empresa/Instituição"]],
+                        ["Data Análise", gIF1["Data Análise"]],
+                        ["Nome do Técnico", gIF1["Nome do Técnico"]],
+                        ["Idade", gIF1["Idade"]],
+                        [],
+                        ["Fase 2 - Informações da Avaliação"],
+                        ["Avaliador", gIF2.Avaliador],
+                        ["Data Avaliação", gIF2["Data Avaliação"]],
+                        ["Local", gIF2.Local],
+                        ["Atividade", gIF2.Atividade],
+                        [],
+                        ["Resultado Geral"],
+                        ["Nível de Risco Geral", oR["Nível de Risco Geral"]],
+                        ["Recomendação", oR["Recomendação"]]
+                    ];
+                    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+                    summarySheet['!cols'] = [{wch: 30}, {wch: 50}]; // Set column widths
+                    XLSX.utils.book_append_sheet(wb, summarySheet, "Resumo");
+
+                    // --- 2. Medidas de Segurança Sheet ---
+                    const medidasData = Array.from(document.querySelectorAll('#fase1 input[data-measure-text]:checked'))
+                        .map(cb => ({ 'Medida de Segurança Verificada': cb.dataset.measureText }));
+                    if (medidasData.length > 0) {
+                        const medidasSheet = XLSX.utils.json_to_sheet(medidasData);
+                        medidasSheet['!cols'] = [{wch: 100}];
+                        XLSX.utils.book_append_sheet(wb, medidasSheet, "Medidas Segurança");
+                    }
+
+                    // --- 3. Material de Emergência Sheet ---
+                    const materialData = Array.from(document.querySelectorAll('#fase1 input[data-material-text]:checked'))
+                        .map(cb => ({ 'Categoria': cb.dataset.materialCategory, 'Item Verificado': cb.dataset.materialText }));
+                    if (materialData.length > 0) {
+                        const materialSheet = XLSX.utils.json_to_sheet(materialData);
+                        materialSheet['!cols'] = [{wch: 30}, {wch: 70}];
+                        XLSX.utils.book_append_sheet(wb, materialSheet, "Material Emergência");
+                    }
+
+                    // --- 4. Fatores de Risco Sheet ---
+                    const f2D = []; 
+                    document.querySelectorAll('#fase2 [id^="row-"]').forEach(r => { 
+                        const f = r.id.split('-')[1]; 
+                        f2D.push({ 
+                            'Dimensão': r.dataset.dimension, 
+                            'Fator de Risco': document.getElementById(`text-${f}`).textContent, 
+                            'Score': parseInt(r.dataset.score),
+                            'Nível': getRiskClassification(parseInt(r.dataset.score)).level 
+                        }); 
+                    });
+                    const f2Sheet = XLSX.utils.json_to_sheet(f2D);
+                    f2Sheet['!cols'] = [{wch: 25}, {wch: 80}, {wch: 10}, {wch: 20}];
+                    XLSX.utils.book_append_sheet(wb, f2Sheet, "Fatores de Risco");
+
                     XLSX.writeFile(wb, `Relatorio_Completo_${gIF2["Data Avaliação"] || 'single'}.xlsx`);
                 };
 
                 const exportPhase1Excel = () => {
                     const wb = XLSX.utils.book_new();
-                    const data = [ { "Análise Preliminar": "" }, {}, { Categoria: "Informações Gerais" }, { "Empresa": document.getElementById('companyName').value, "Data": document.getElementById('preliminaryDate').value, "Técnico": document.getElementById('technicianName').value, "Idade": document.getElementById('technicianAge').value }, {}, { Categoria: "Medidas de Segurança Verificadas" } ]; document.querySelectorAll('#fase1 input[data-measure-text]:checked').forEach(cb => data.push({ Detalhe: cb.dataset.measureText }));
-                    data.push({}, { Categoria: "Material e Equipamento Verificado" }); document.querySelectorAll('#fase1 input[data-material-text]:checked').forEach(cb => data.push({ Categoria: cb.dataset.materialCategory, Detalhe: cb.dataset.materialText }));
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Análise Preliminar");
+
+                    // --- 1. Resumo Sheet ---
+                    const gIF1 = { "Empresa/Instituição": document.getElementById('companyName').value, "Data": document.getElementById('preliminaryDate').value, "Técnico": document.getElementById('technicianName').value, "Idade": document.getElementById('technicianAge').value };
+                    const summaryData = [
+                        ["Análise Preliminar"],
+                        [],
+                        ["Informações Gerais"],
+                        ["Empresa/Instituição", gIF1["Empresa/Instituição"]],
+                        ["Data", gIF1.Data],
+                        ["Técnico", gIF1.Técnico],
+                        ["Idade", gIF1.Idade]
+                    ];
+                    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+                    summarySheet['!cols'] = [{wch: 30}, {wch: 50}];
+                    XLSX.utils.book_append_sheet(wb, summarySheet, "Resumo");
+                    
+                    // --- 2. Medidas de Segurança Sheet ---
+                    const medidasData = Array.from(document.querySelectorAll('#fase1 input[data-measure-text]:checked'))
+                        .map(cb => ({ 'Medida de Segurança Verificada': cb.dataset.measureText }));
+                    if (medidasData.length > 0) {
+                        const medidasSheet = XLSX.utils.json_to_sheet(medidasData);
+                        medidasSheet['!cols'] = [{wch: 100}];
+                        XLSX.utils.book_append_sheet(wb, medidasSheet, "Medidas Segurança");
+                    }
+
+                    // --- 3. Material de Emergência Sheet ---
+                    const materialData = Array.from(document.querySelectorAll('#fase1 input[data-material-text]:checked'))
+                        .map(cb => ({ 'Categoria': cb.dataset.materialCategory, 'Item Verificado': cb.dataset.materialText }));
+                    if (materialData.length > 0) {
+                        const materialSheet = XLSX.utils.json_to_sheet(materialData);
+                        materialSheet['!cols'] = [{wch: 30}, {wch: 70}];
+                        XLSX.utils.book_append_sheet(wb, materialSheet, "Material Emergência");
+                    }
+
                     XLSX.writeFile(wb, `Analise_Preliminar_${document.getElementById('preliminaryDate').value || 'report'}.xlsx`);
                 };
 
                 const exportFilteredExcel = () => {
                     if (filteredAssessments.length === 0) return showNotification("Nenhum dado filtrado para exportar.", true);
-                    const sumD=filteredAssessments.map(i=>({'Data':i.fase2.evalDate,'Avaliador':i.fase2.evaluatorName,'Local':i.fase2.location,'Atividade':i.fase2.activity,'Nível Risco':i.fase2.overallRiskLevel,'Recomendação':i.fase2.overallRecommendation}));
-                    const detD=[]; filteredAssessments.forEach((i,idx)=>{i.fase2.factors.forEach(f=>{detD.push({'ID Avaliação':idx+1,'Data':i.fase2.evalDate,'Avaliador':i.fase2.evaluatorName,'Dimensão':f.dimension,'Fator':f.text,'Score':f.score,'Nível':getRiskClassification(f.score).level});});});
-                    const wb=XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sumD), "Resumo");
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detD), "Dados Completos");
-                    XLSX.writeFile(wb,`Export_Filtrado_${new Date().toISOString().slice(0,10)}.xlsx`);
+                    
+                    const wb = XLSX.utils.book_new();
+
+                    // --- Resumo Sheet ---
+                    const sumD = filteredAssessments.map(i => ({
+                        'Data': i.createdAt?.toDate ? i.createdAt.toDate().toLocaleDateString() : (i.fase2.evalDate ? new Date(i.fase2.evalDate + 'T00:00:00').toLocaleDateString() : 'Sem data'),
+                        'Avaliador': i.fase2.evaluatorName,
+                        'Local': i.fase2.location,
+                        'Atividade': i.fase2.activity,
+                        'Nível Risco': i.fase2.overallRiskLevel,
+                        'Recomendação': i.fase2.overallRecommendation
+                    }));
+                    const summarySheet = XLSX.utils.json_to_sheet(sumD);
+                    summarySheet['!cols'] = [{wch: 12}, {wch: 25}, {wch: 30}, {wch: 30}, {wch: 15}, {wch: 20}];
+                    XLSX.utils.book_append_sheet(wb, summarySheet, "Resumo Filtrado");
+                    
+                    // --- Detalhes Sheet ---
+                    const detD = []; 
+                    filteredAssessments.forEach((i, idx) => {
+                        i.fase2.factors.forEach(f => {
+                            detD.push({
+                                'ID Avaliação': idx + 1,
+                                'Data': i.createdAt?.toDate ? i.createdAt.toDate().toLocaleDateString() : (i.fase2.evalDate ? new Date(i.fase2.evalDate + 'T00:00:00').toLocaleDateString() : 'Sem data'),
+                                'Avaliador': i.fase2.evaluatorName,
+                                'Dimensão': f.dimension,
+                                'Fator': f.text,
+                                'Score': f.score,
+                                'Nível': getRiskClassification(f.score).level
+                            });
+                        });
+                    });
+                    const detailsSheet = XLSX.utils.json_to_sheet(detD);
+                    detailsSheet['!cols'] = [{wch: 12}, {wch: 12}, {wch: 25}, {wch: 25}, {wch: 80}, {wch: 10}, {wch: 20}];
+                    XLSX.utils.book_append_sheet(wb, detailsSheet, "Dados Completos Filtrados");
+                    
+                    XLSX.writeFile(wb, `Export_Filtrado_${new Date().toISOString().slice(0,10)}.xlsx`);
                 };
 
                 const exportPdf = (selector) => {
@@ -487,3 +620,4 @@
     </script>
 </body>
 </html>
+
