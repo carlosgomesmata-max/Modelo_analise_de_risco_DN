@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
@@ -425,7 +425,14 @@
                     });
                     const oC = getRiskClassification(highestRiskScore);
                     const assessmentData = { fase1: fase1Data, fase2: { ...fase2Data, factors: evaluatedFactors, overallRiskLevel: oC.level, overallRecommendation: oC.recommendation }, userId, createdAt: serverTimestamp() };
-                    try { await addDoc(collection(db, `artifacts/${appId_str}/public/data/assessments`), assessmentData); showNotification("Avaliação guardada com sucesso!"); } catch (e) { console.error(e); showNotification("Erro ao guardar a avaliação.", true); }
+                    try { 
+                        await addDoc(collection(db, `artifacts/${appId_str}/public/data/assessments`), assessmentData); 
+                        showNotification("Avaliação guardada com sucesso!"); 
+                        clearForm();
+                    } catch (e) { 
+                        console.error(e); 
+                        showNotification("Erro ao guardar a avaliação.", true); 
+                    }
                 }
 
                 const clearForm = () => { 
